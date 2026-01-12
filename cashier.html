@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>نظام الكاشير الذكي PRO</title>
+    
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #2c3e50; /* لون داكن احترافي */
+            --accent: #3498db; /* لون مميز */
+            --secondary: #ecf0f1;
+            --success: #27ae60;
+            --danger: #c0392b;
+            --warning: #f39c12;
+            --text: #2c3e50;
+            --bg: #f4f6f7;
+            --card: #ffffff;
+            --header-h: 50px;
+            --nav-h: 65px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg); margin: 0; padding: 0;
+            color: var(--text); height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        /* --- Header & Credits --- */
+        header {
+            background: var(--primary); color: white; height: var(--header-h);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
+        }
+        .app-title h1 { margin: 0; font-size: 16px; font-weight: bold; }
+        .credits { font-size: 10px; opacity: 0.8; margin-right: 5px; color: #bdc3c7; }
+        .header-stats {
+            background: var(--success); padding: 5px 10px; border-radius: 20px;
+            font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* --- Main Layout --- */
+        .main-content {
+            flex: 1; position: relative; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .page {
+            display: none; height: 100%; width: 100%; position: absolute; top: 0; right: 0;
+            background: var(--bg); overflow-y: auto; padding-bottom: var(--nav-h);
+        }
+        .page.active { display: block; }
+        .page.no-scroll { overflow: hidden; } /* لصفحة الكاشير */
+
+        /* --- POS Layout (Split Screen) --- */
+        #page-pos { display: none; flex-direction: column; height: 100%; padding-bottom: var(--nav-h); }
+        #page-pos.active { display: flex; }
+
+        .pos-top-section {
+            height: 40%; display: flex; background: #fff;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        /* Top Right: Camera */
+        .pos-camera-box {
+            width: 50%; background: #000; position: relative;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        #reader { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Top Left: Payment Info */
+        .pos-payment-box {
+            width: 50%; padding: 10px; display: flex; flex-direction: column; gap: 5px;
+            background: #f8f9fa; border-left: 1px solid #ddd;
+        }
+        .payment-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .big-total { font-size: 24px; color: var(--primary); font-weight: bold; text-align: center; margin: 5px 0; }
+        .pay-input {
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;
+            text-align: center; font-weight: bold; font-size: 16px; color: var(--success);
+        }
+        .change-display { 
+            background: #eee; padding: 5px; border-radius: 5px; text-align: center; 
+            font-weight: bold; color: var(--danger); 
+        }
+        .action-buttons { display: flex; gap: 5px; margin-top: auto; }
+        .action-buttons button { flex: 1; padding: 8px; font-size: 12px; }
+
+        /* Search Bar & Suggestions */
+        .search-container { position: relative; padding: 8px; background: #fff; border-bottom: 1px solid #eee; z-index: 50; }
+        .search-input { width: 100%; padding: 10px; border-radius: 20px; border: 1px solid #ddd; padding-right: 35px; }
+        .search-icon { position: absolute; right: 18px; top: 18px; color: #aaa; }
+        .search-suggestions {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; border: 1px solid #ddd; border-top: none;
+            max-height: 200px; overflow-y: auto; shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .suggestion-item {
+            padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between;
+        }
+        .suggestion-item:hover { background: #f0faff; }
+
+        /* Bottom: Cart List (Scrollable) */
+        .pos-bottom-section {
+            flex: 1; overflow-y: auto; padding: 10px;
+            background: var(--bg);
+        }
+        .cart-item {
+            background: white; padding: 10px; margin-bottom: 8px; border-radius: 8px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); border-right: 4px solid var(--accent);
+        }
+        .cart-item-details strong { display: block; font-size: 14px; margin-bottom: 2px; }
+        .cart-item-details small { color: #7f8c8d; }
+        .cart-controls { display: flex; align-items: center; gap: 8px; }
+        .qty-btn { width: 25px; height: 25px; border-radius: 50%; border: 1px solid #ddd; background: #fff; }
+        .del-btn { color: var(--danger); background: none; border: none; }
+
+        /* --- Inventory & Cards --- */
+        .card-grid { padding: 10px; }
+        .product-card {
+            background: white; padding: 15px; margin-bottom: 10px; border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;
+        }
+        .stock-badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .in-stock { background: #d4edda; color: #155724; }
+        .low-stock { background: #f8d7da; color: #721c24; }
+
+        /* --- Modals --- */
+        .modal {
+            display: none; position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            background: white; padding: 20px; width: 90%; max-width: 400px; border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from {transform: translateY(20px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        
+        .form-group { margin-bottom: 12px; }
+        .form-label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: bold; color: #555; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        
+        .receipt-preview {
+            background: #fff; border: 1px dashed #ccc; padding: 15px; margin: 10px 0;
+            font-family: 'Courier New', Courier, monospace; text-align: center; font-size: 12px;
+        }
+        .receipt-table { width: 100%; text-align: right; margin-top: 10px; border-collapse: collapse; }
+        .receipt-table td { padding: 4px 0; border-bottom: 1px dotted #eee; }
+
+        /* --- Bottom Nav --- */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-h);
+            background: white; display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000;
+        }
+        .nav-btn {
+            background: none; border: none; color: #95a5a6;
+            display: flex; flex-direction: column; align-items: center; font-size: 10px;
+        }
+        .nav-btn i { font-size: 20px; margin-bottom: 4px; }
+        .nav-btn.active { color: var(--accent); }
+
+        /* Helpers */
+        .btn { padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+        .d-flex { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="app-title">
+            <h1 id="header-store-name">متجري</h1>
+            <span class="credits">أنتاج: هاشم محمد الغولي ت/777755751</span>
+        </div>
+        <div class="header-stats">
+            مبيعات اليوم: <span id="daily-total">0.00</span>
+        </div>
+    </header>
+
+    <div class="main-content">
+        
+        <div id="page-pos" class="page active no-scroll">
+            
+            <div class="search-container">
+                <i class="fa-solid fa-search search-icon"></i>
+                <input type="text" id="manual-search" class="search-input" placeholder="ابحث باسم المنتج..." oninput="handleSearch(this.value)">
+                <div id="search-results" class="search-suggestions"></div>
+            </div>
+
+            <div class="pos-top-section">
+                <div class="pos-camera-box">
+                    <div id="reader"></div>
+                    <div style="position: absolute; color: white; font-size: 10px; bottom: 5px;">ماسح الباركود</div>
+                </div>
+
+                <div class="pos-payment-box">
+                    <div class="big-total" id="cart-total">0.00</div>
+                    <div class="payment-row">
+                        <span>المدفوع:</span>
+                    </div>
+                    <input type="number" id="pay-amount" class="pay-input" placeholder="0.00" oninput="calculateChange()">
+                    
+                    <div class="payment-row" style="margin-top:5px;">
+                        <span>الباقي:</span>
+                    </div>
+                    <div class="change-display" id="change-amount">0.00</div>
+                    
+                    <div class="action-buttons">
+                        <button class="btn-success" onclick="processCheckout()"><i class="fa-solid fa-check"></i> بيع</button>
+                        <button class="btn-primary" onclick="capturePosScreen()"><i class="fa-solid fa-camera"></i> صورة</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pos-bottom-section" id="cart-list">
+                <div style="text-align:center; color:#bdc3c7; margin-top:50px;">
+                    <i class="fa-solid fa-basket-shopping" style="font-size:40px;"></i>
+                    <p>السلة فارغة</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-inventory" class="page">
+            <div style="padding: 15px;">
+                <div class="d-flex" style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="openProductModal()">
+                        <i class="fa-solid fa-plus"></i> إضافة منتج جديد
+                    </button>
+                    <button class="btn btn-danger" onclick="clearData()" style="width: auto;">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+                <div id="inventory-list" class="card-grid"></div>
+            </div>
+        </div>
+
+        <div id="page-sales" class="page">
+            <div style="padding: 15px;">
+                <h3>سجل العمليات</h3>
+                <div id="sales-history" class="card-grid"></div>
+            </div>
+        </div>
+
+        <div id="page-settings" class="page">
+            <div style="padding: 20px;">
+                <h3>الإعدادات العامة</h3>
+                <div class="form-group">
+                    <label class="form-label">اسم المتجر / الشركة</label>
+                    <input type="text" id="setting-store-name" class="form-control" placeholder="ادخل اسم المتجر">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">رسالة أسفل الفاتورة</label>
+                    <input type="text" id="setting-footer-msg" class="form-control" placeholder="مثال: شكراً لزيارتكم">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">العملة</label>
+                    <input type="text" id="setting-currency" class="form-control" placeholder="ريال، دولار...">
+                </div>
+                <button class="btn btn-success" onclick="saveSettings()">حفظ الإعدادات</button>
+                
+                <hr>
+                <button class="btn btn-primary" onclick="exportData()">
+                    <i class="fa-solid fa-download"></i> نسخ احتياطي للبيانات
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-btn active" onclick="navTo('pos')">
+            <i class="fa-solid fa-cash-register"></i> نقطة البيع
+        </button>
+        <button class="nav-btn" onclick="navTo('inventory')">
+            <i class="fa-solid fa-boxes-stacked"></i> المخزون
+        </button>
+        <button class="nav-btn" onclick="navTo('sales')">
+            <i class="fa-solid fa-chart-line"></i> المبيعات
+        </button>
+        <button class="nav-btn" onclick="navTo('settings')">
+            <i class="fa-solid fa-gear"></i> الإعدادات
+        </button>
+    </nav>
+
+    <div id="product-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">بيانات المنتج</h3>
+            <div class="form-group">
+                <label class="form-label">الباركود (امسح أو اكتب)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="prod-barcode" class="form-control" onchange="checkProductExists(this.value)">
+                    <button class="btn btn-primary" onclick="startScanForEdit()" style="width:50px;"><i class="fa-solid fa-barcode"></i></button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">اسم المنتج</label>
+                <input type="text" id="prod-name" class="form-control">
+            </div>
+            <div class="d-flex">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">السعر</label>
+                    <input type="number" id="prod-price" class="form-control">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">الكمية بالمخزون</label>
+                    <input type="number" id="prod-stock" class="form-control">
+                </div>
+            </div>
+            <div class="d-flex" style="margin-top:10px;">
+                <button class="btn btn-success" onclick="saveProduct()">حفظ</button>
+                <button class="btn btn-danger" onclick="closeModal('product-modal')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="receipt-modal" class="modal">
+        <div class="modal-content">
+            <div style="text-align:center; margin-bottom:10px;">
+                <i class="fa-solid fa-circle-check" style="color:var(--success); font-size:40px;"></i>
+                <h4>تمت العملية بنجاح</h4>
+            </div>
+            
+            <div id="receipt-node" class="receipt-preview">
+                </div>
+
+            <div class="d-flex" style="flex-direction: column; gap: 8px;">
+                <button class="btn btn-primary" onclick="printReceipt()"><i class="fa-solid fa-print"></i> طباعة الفاتورة</button>
+                <button class="btn btn-success" onclick="saveReceiptImage()"><i class="fa-solid fa-image"></i> حفظ كصورة</button>
+                <button class="btn btn-outline" onclick="closeModal('receipt-modal')">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="beep-sound" src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQxAFRTU0UAAAAOAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABxwCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAD//uQZAAACAAAAABAAAAP8AAAAA//uQZAAACAAAAABAAAAP8AAAAA//uQZAAACAAAAABAAAAP8AAAAA" ></audio>
+
+    <script>
+        // --- تهيئة قاعدة البيانات ---
+        let db = {
+            products: JSON.parse(localStorage.getItem('pos_products')) || {},
+            sales: JSON.parse(localStorage.getItem('pos_sales')) || [],
+            settings: JSON.parse(localStorage.getItem('pos_settings')) || {
+                storeName: "متجري",
+                currency: "ريال",
+                footerMsg: "شكراً لزيارتكم"
+            }
+        };
+
+        let cart = [];
+        let html5QrcodeScanner = null;
+        let isScannerActive = false;
+        let currentScanMode = 'POS'; // 'POS' or 'EDIT'
+
+        // --- عند التحميل ---
+        window.onload = function() {
+            applySettings();
+            initScanner();
+            renderHistory();
+            renderInventory();
+            updateDailyTotal();
+            
+            // تهيئة إغلاق القوائم عند النقر خارجها
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.search-container')) {
+                    document.getElementById('search-results').style.display = 'none';
+                }
+            });
+        };
+
+        function saveDB() {
+            localStorage.setItem('pos_products', JSON.stringify(db.products));
+            localStorage.setItem('pos_sales', JSON.stringify(db.sales));
+            localStorage.setItem('pos_settings', JSON.stringify(db.settings));
+            updateDailyTotal();
+        }
+
+        // --- الكاميرا والباركود ---
+        function initScanner() {
+            // استخدام الكاميرا الخلفية
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", config, false);
+            html5QrcodeScanner.render(onScanSuccess, (err) => {});
+        }
+
+        function onScanSuccess(decodedText) {
+            document.getElementById('beep-sound').play().catch(e=>{});
+
+            if (currentScanMode === 'EDIT') {
+                // وضع التعديل (في نافذة المودال)
+                document.getElementById('prod-barcode').value = decodedText;
+                checkProductExists(decodedText);
+                return; // لا نضيف للسلة
+            }
+
+            // وضع البيع الطبيعي
+            if(document.getElementById('page-pos').classList.contains('active')) {
+                addToCart(decodedText);
+            }
+        }
+
+        // --- منطق البحث الذكي (Live Search) ---
+        function handleSearch(query) {
+            const resultsDiv = document.getElementById('search-results');
+            if (!query) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            // البحث في المنتجات
+            const matches = Object.values(db.products).filter(p => 
+                p.name.includes(query) || p.barcode.includes(query)
+            );
+
+            resultsDiv.innerHTML = '';
+            if (matches.length > 0) {
+                resultsDiv.style.display = 'block';
+                matches.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerHTML = `<span>${p.name}</span> <b>${p.price} ${db.settings.currency}</b>`;
+                    div.onclick = () => {
+                        addToCart(p.barcode);
+                        document.getElementById('manual-search').value = '';
+                        resultsDiv.style.display = 'none';
+                    };
+                    resultsDiv.appendChild(div);
+                });
+            } else {
+                resultsDiv.style.display = 'none';
+            }
+        }
+
+        // --- إدارة السلة والبيع (POS) ---
+        function addToCart(barcode) {
+            let product = db.products[barcode];
+
+            if (!product) {
+                // إذا المنتج غير موجود، نفتح نافذة الإضافة مباشرة
+                if(confirm(`المنتج (كود: ${barcode}) غير موجود. هل تريد إضافته الآن؟`)) {
+                    openProductModal(barcode);
+                }
+                return;
+            }
+
+            // التحقق من المخزون
+            if (product.stock <= 0) {
+                alert("تنبيه: الكمية نفذت!");
+            }
+
+            const existing = cart.find(item => item.barcode === product.barcode);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ ...product, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-list');
+            container.innerHTML = '';
+            let total = 0;
+
+            if (cart.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; color:#bdc3c7; margin-top:50px;">
+                        <i class="fa-solid fa-basket-shopping" style="font-size:40px;"></i>
+                        <p>ابدأ المسح لإضافة منتجات</p>
+                    </div>`;
+            } else {
+                cart.forEach((item, index) => {
+                    total += item.price * item.qty;
+                    container.innerHTML += `
+                        <div class="cart-item">
+                            <div class="cart-item-details">
+                                <strong>${item.name}</strong>
+                                <small>${item.price} x ${item.qty} = ${(item.price * item.qty).toFixed(2)}</small>
+                            </div>
+                            <div class="cart-controls">
+                                <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                                <span>${item.qty}</span>
+                                <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                                <button class="del-btn" onclick="removeFromCart(${index})"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('cart-total').innerText = total.toFixed(2) + ' ' + db.settings.currency;
+            calculateChange(); // تحديث الباقي
+        }
+
+        function updateQty(index, change) {
+            cart[index].qty += change;
+            if (cart[index].qty <= 0) cart.splice(index, 1);
+            renderCart();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            renderCart();
+        }
+
+        function calculateChange() {
+            const total = parseFloat(document.getElementById('cart-total').innerText);
+            const paid = parseFloat(document.getElementById('pay-amount').value) || 0;
+            const change = paid - total;
+            
+            const display = document.getElementById('change-amount');
+            display.innerText = change.toFixed(2) + ' ' + db.settings.currency;
+            
+            if (change < 0) {
+                display.style.color = 'var(--danger)'; // أحمر إذا عليه دين
+                display.innerText = "باقي: " + Math.abs(change).toFixed(2);
+            } else {
+                display.style.color = 'var(--success)'; // أخضر إذا له باقي
+            }
+        }
+
+        function processCheckout() {
+            if (cart.length === 0) return alert("السلة فارغة");
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            
+            // خصم المخزون
+            cart.forEach(item => {
+                if (db.products[item.barcode]) {
+                    db.products[item.barcode].stock -= item.qty;
+                }
+            });
+
+            const sale = {
+                id: Date.now(),
+                date: new Date().toLocaleString('ar-SA'),
+                items: [...cart],
+                total: total
+            };
+
+            db.sales.unshift(sale);
+            saveDB();
+            
+            prepareReceipt(sale);
+            document.getElementById('receipt-modal').style.display = 'flex';
+            
+            cart = [];
+            document.getElementById('pay-amount').value = '';
+            renderCart();
+            renderInventory(); // تحديث الواجهات الأخرى
+            renderHistory();
+        }
+
+        // --- إدارة الفاتورة ---
+        function prepareReceipt(sale) {
+            const paid = parseFloat(document.getElementById('pay-amount').value) || sale.total;
+            const change = paid - sale.total;
+            
+            let html = `
+                <h3>${db.settings.storeName}</h3>
+                <p>${sale.date}</p>
+                <p>رقم الفاتورة: #${sale.id.toString().slice(-4)}</p>
+                <hr style="border-top:1px dashed #ccc">
+                <table class="receipt-table">
+                    <tr><th>الصنف</th><th>الكمية</th><th>الإجمالي</th></tr>
+            `;
+            
+            sale.items.forEach(item => {
+                html += `<tr>
+                    <td>${item.name}</td>
+                    <td>${item.qty}</td>
+                    <td>${(item.price * item.qty).toFixed(2)}</td>
+                </tr>`;
+            });
+            
+            html += `
+                </table>
+                <hr style="border-top:1px dashed #ccc">
+                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px;">
+                    <span>الإجمالي:</span>
+                    <span>${sale.total.toFixed(2)} ${db.settings.currency}</span>
+                </div>
+            `;
+            
+            // إضافة المدفوع والباقي للفاتورة
+            if(document.getElementById('pay-amount').value) {
+                 html += `
+                <div style="display:flex; justify-content:space-between; font-size:12px;">
+                    <span>المدفوع:</span>
+                    <span>${paid.toFixed(2)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:12px;">
+                    <span>الباقي:</span>
+                    <span>${change.toFixed(2)}</span>
+                </div>
+            `;
+            }
+
+            html += `<br><small>${db.settings.footerMsg}</small>
+                     <br><small style="font-size:8px; color:#ccc">System by Hashem Al-Ghouli</small>`;
+
+            document.getElementById('receipt-node').innerHTML = html;
+        }
+
+        function printReceipt() {
+            const content = document.getElementById('receipt-node').innerHTML;
+            const win = window.open('', '', 'width=300,height=600');
+            win.document.write(`<html dir="rtl" style="font-family:monospace"><body style="text-align:center">${content}</body></html>`);
+            win.print();
+            win.close();
+        }
+
+        function saveReceiptImage() {
+            const element = document.getElementById('receipt-node');
+            html2canvas(element).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'receipt_' + Date.now() + '.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+        
+        // حفظ الشاشة العلوية في POS كصورة
+        function capturePosScreen() {
+             const element = document.querySelector('.pos-payment-box'); // أو أي عنصر تريد
+             html2canvas(element).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'pos_screen_' + Date.now() + '.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        // --- إدارة المنتجات (إضافة / تعديل) ---
+        function openProductModal(barcode = '') {
+            document.getElementById('product-modal').style.display = 'flex';
+            document.getElementById('prod-barcode').value = barcode;
+            
+            if (barcode && db.products[barcode]) {
+                checkProductExists(barcode);
+            } else {
+                // تصفير الحقول
+                document.getElementById('modal-title').innerText = "إضافة منتج جديد";
+                document.getElementById('prod-name').value = '';
+                document.getElementById('prod-price').value = '';
+                document.getElementById('prod-stock').value = '';
+            }
+        }
+
+        function checkProductExists(code) {
+            if (db.products[code]) {
+                const p = db.products[code];
+                document.getElementById('modal-title').innerText = "تعديل منتج موجود";
+                document.getElementById('prod-name').value = p.name;
+                document.getElementById('prod-price').value = p.price;
+                document.getElementById('prod-stock').value = p.stock;
+            } else {
+                 document.getElementById('modal-title').innerText = "إضافة منتج جديد";
+                 // إبقاء الحقول فارغة للتعبئة
+            }
+        }
+        
+        function startScanForEdit() {
+            // هنا فقط نقوم بتبديل وضع المتغير ليتم استخدامه في onScanSuccess
+            // بما أن الكاميرا تعمل بالفعل في الخلفية، نستخدم زر يدوي لو أردنا
+            // لكن لتبسيط الأمر، يمكن كتابة الباركود يدوياً أو استخدام القارئ الخارجي
+            alert("استخدم القارئ في الشاشة الرئيسية ثم انسخ الرقم، أو اكتبه يدوياً.");
+        }
+
+        function saveProduct() {
+            const code = document.getElementById('prod-barcode').value;
+            const name = document.getElementById('prod-name').value;
+            const price = parseFloat(document.getElementById('prod-price').value);
+            const stock = parseInt(document.getElementById('prod-stock').value);
+
+            if (!code || !name || isNaN(price)) {
+                alert("الرجاء إدخال البيانات الأساسية");
+                return;
+            }
+
+            db.products[code] = {
+                barcode: code,
+                name: name,
+                price: price,
+                stock: stock || 0
+            };
+            
+            saveDB();
+            renderInventory();
+            closeModal('product-modal');
+            
+            // إذا كنا في صفحة البيع وتمت الإضافة من هناك، نضيفه للسلة فوراً
+            if (document.getElementById('page-pos').classList.contains('active')) {
+                addToCart(code);
+            }
+            alert("تم الحفظ بنجاح");
+        }
+
+        function renderInventory() {
+            const list = document.getElementById('inventory-list');
+            list.innerHTML = '';
+            Object.values(db.products).forEach(p => {
+                const stockClass = p.stock < 5 ? 'low-stock' : 'in-stock';
+                list.innerHTML += `
+                    <div class="product-card">
+                        <div>
+                            <strong>${p.name}</strong>
+                            <div style="font-size:12px; color:#777">بار: ${p.barcode}</div>
+                            <div style="color:var(--accent); font-weight:bold">${p.price} ${db.settings.currency}</div>
+                        </div>
+                        <div style="text-align:left">
+                            <span class="stock-badge ${stockClass}">مخزون: ${p.stock}</span>
+                            <br><br>
+                            <button class="btn btn-primary" style="padding:5px 15px" onclick="openProductModal('${p.barcode}')">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // --- المبيعات والتقارير ---
+        function renderHistory() {
+            const list = document.getElementById('sales-history');
+            list.innerHTML = '';
+            db.sales.slice(0, 50).forEach(sale => {
+                list.innerHTML += `
+                    <div class="product-card">
+                        <div>
+                            <strong>فاتورة #${sale.id.toString().slice(-4)}</strong>
+                            <div style="font-size:11px; color:#888">${sale.date}</div>
+                        </div>
+                        <div style="color:var(--success); font-weight:bold; font-size:18px;">
+                            ${sale.total.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function updateDailyTotal() {
+            // تنسيق التاريخ الحالي حسب لغة الجهاز للمقارنة
+            // الطريقة الأضمن هي مقارنة التواريخ كـ String بسيط
+            const todayStr = new Date().toDateString(); 
+            
+            const total = db.sales.reduce((sum, sale) => {
+                // تحويل تاريخ البيع إلى كائن Date
+                // نفترض أن التاريخ المخزن يمكن تحليله
+                // بما أننا خزننا toLocaleString، التحليل قد يختلف.
+                // للأمان، سنجمع كل المبيعات، وفي التطبيق الحقيقي يجب تخزين Timestamp
+                const saleDate = new Date(sale.id).toDateString(); // نستخدم ID لأنه Timestamp
+                if(saleDate === todayStr) {
+                    return sum + sale.total;
+                }
+                return sum;
+            }, 0);
+
+            document.getElementById('daily-total').innerText = total.toFixed(2) + ' ' + db.settings.currency;
+        }
+
+        // --- الإعدادات ---
+        function applySettings() {
+            document.getElementById('header-store-name').innerText = db.settings.storeName;
+            document.getElementById('setting-store-name').value = db.settings.storeName;
+            document.getElementById('setting-footer-msg').value = db.settings.footerMsg;
+            document.getElementById('setting-currency').value = db.settings.currency;
+        }
+
+        function saveSettings() {
+            db.settings.storeName = document.getElementById('setting-store-name').value;
+            db.settings.footerMsg = document.getElementById('setting-footer-msg').value;
+            db.settings.currency = document.getElementById('setting-currency').value;
+            saveDB();
+            applySettings();
+            alert("تم حفظ الإعدادات");
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const node = document.createElement('a');
+            node.setAttribute("href", dataStr);
+            node.setAttribute("download", "backup_" + Date.now() + ".json");
+            document.body.appendChild(node);
+            node.click();
+            node.remove();
+        }
+
+        function clearData() {
+            if(confirm("تحذير خطير: سيتم حذف جميع البيانات والمبيعات والمنتجات! هل أنت متأكد؟")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        // --- وظائف النظام ---
+        function navTo(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            // إعادة تشغيل الكاميرا فقط في صفحة البيع لتوفير الموارد
+            /* ملاحظة: html5-qrcode قد يحتاج لإعادة تهيئة، 
+               لكننا تركناه يعمل في الخلفية للسرعة في هذا المثال */
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+    </script>
+</body>
+</html>
